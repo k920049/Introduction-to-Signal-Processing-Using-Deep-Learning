@@ -31,13 +31,13 @@ class SIGN_file_reader(object):
     def get_size(self, mode):
         # return the size of the list
         if (mode == "size:train:pos"):
-            return len(train_pos_filelist)
+            return len(self.train_pos_filelist)
         elif (mode == "size:train:neg"):
-            return len(train_neg_filelist)
+            return len(self.train_neg_filelist)
         elif (mode == "size:test:pos"):
-            return len(test_pos_filelist)
+            return len(self.test_pos_filelist)
         elif (mode == "size:test:neg"):
-            return len(test_neg_filelist)
+            return len(self.test_neg_filelist)
         else:
             print("Error : Invalid mode has been entered", file=sys.stderr)
             return None
