@@ -13,10 +13,10 @@ class SIGN_file_reader(object):
     def __read_directory(self):
         # environment variables
         cwd = os.getcwd()
-        self.train_demo_pos_path = os.path.join(cwd, "../demo/traindemo/pos")
-        self.train_demo_neg_path = os.path.join(cwd, "../demo/traindemo/neg")
-        self.test_demo_pos_path = os.path.join(cwd, "../demo/testdemo/pos")
-        self.test_demo_neg_path = os.path.join(cwd, "../demo/testdemo/neg")
+        self.train_demo_pos_path = os.path.join(cwd, "../data/traindemo/pos")
+        self.train_demo_neg_path = os.path.join(cwd, "../data/traindemo/neg")
+        self.test_demo_pos_path = os.path.join(cwd, "../data/testdemo/pos")
+        self.test_demo_neg_path = os.path.join(cwd, "../data/testdemo/neg")
         # file I/O
         self.train_pos_filelist = []
         self.train_neg_filelist = []

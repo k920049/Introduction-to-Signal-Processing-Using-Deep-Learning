@@ -4,7 +4,8 @@ from SIGN_file_reader import SIGN_file_reader
 from SIGN_model import model
 from PIL import Image
 
-tf.logging.set_verbosity(v=tf.logging.ERROR)
+tf.logging.set_verbosity(verbosity=tf.logging.ERROR)
+
 
 def main():
     # getting a reader
@@ -59,7 +60,8 @@ def main():
         threads = tf.train.start_queue_runners(coord=coord)
         tp_x_batch = sess.run(train_x_pos_batch)
         tn_x_batch = sess.run(train_x_neg_batch)
-        tep_x_batch = sess.run(
+        tep_x_batch = sess.run(test_x_pos_batch)
+        ten_x_batch = sess.run(test_x_neg_batch)
 
         coord.request_stop()
         coord.join(threads)
