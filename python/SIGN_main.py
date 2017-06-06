@@ -1,10 +1,14 @@
 import tensorflow as tf
 import numpy as np
+import SIGN_model
 from SIGN_file_reader import SIGN_file_reader
-from SIGN_model import model
+from SIGN_aux import sample_Z
 from PIL import Image
 
 tf.logging.set_verbosity(verbosity=tf.logging.ERROR)
+
+batch_size = 128
+iteration = 1000
 
 
 def main():
@@ -58,13 +62,41 @@ def main():
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord)
-        tp_x_batch = sess.run(train_x_pos_batch)
-        tn_x_batch = sess.run(train_x_neg_batch)
-        tep_x_batch = sess.run(test_x_pos_batch)
-        ten_x_batch = sess.run(test_x_neg_batch)
 
-        coord.request_stop()
-        coord.join(threads)
+        for it in range(iteration):
+        # train step
+            # positive
+            tp_x_batch = sess.run(train_x_pos_batch)
+            x_batch_reshaped = tf.reshape(
+                tensor=tp_x_batch, shape=[128, SIGN_model.X_dim])
+
+            Z_sample = sample_Z(batch_size, SIGN_model.Z_dim)
+            Y_label = np.zeros(shape=[batch_size, SIGN_model.Y_dim])
+            Y_label[:, 1] = 1
+
+            _, D_loss_current = sess.run([SIGN_model.D_solver, SIGN_model.D_loss], feed_dict={
+                SIGN_model.X: x_batch_reshaped, SIGN_model.Y: Y_label, SIGN_model.Z: Z_sample})
+            _, G_loss_current = sess.run([SIGN_model.G_solver, SIGN_model.G_loss], feed_dict={
+                SIGN_model.Y: Y_label, SIGN_model.Z: Z_sample})
+
+            if it % 100 == 0:
+                print("Iteration : {}".format(it))
+                print("Discriminator loss : {:.4}".format(D_loss_current))
+                print("Generator loss : {:.4}".format(G_loss_current))
+                print()
+
+            # negative
+            tn_x_batch = sess.run(train_x_neg_batch)
+
+        # test step
+            # positive
+            tep_x_batch = sess.run(test_x_pos_batch)
+
+            # negative
+            ten_x_batch = sess.run(test_x_neg_batch)
+
+            coord.request_stop()
+            coord.join(threads)``
 
     '''
     Image.fromarray(np.reshape(first, newshape=[255, 255]), mode="F").show()
