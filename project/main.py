@@ -74,33 +74,34 @@ def get_list(queue):
 
     set_epoch(epoch)
 
+for i in range(4):
+    iterations.append(get_iteration(i))
 
-def get_batch(image, class_index):
+def get_batch(queue, index, class_index, total):
     batch_list = []
-    for i in range(iteration[0]):
-        image = sequence[0][3].eval()
+    for i in range(iterations[index]):
+        image = queue.eval()
         image = np.reshape(image, newshape=(width, height, 1))
         batch_list.append(image)
 
         if len(batch_list) == batch:
             X = np.stack(batch_list)
-            y = np.ones(shape=(len(batch_list), 1), dtype=np.int32)
-            y = class_index * y
+            y = np.zeros(shape=(len(batch_list), total), dtype=np.float32)
+            y[:, class_index] = 1
+            y_label = np.ones(shape=(len(batch_list)), dtype=np.int32)
+            y_label = y_label * class_index
             batch_list.clear()
-            yield X, y
-        elif i == len(iterations[0]) - 1:
+            yield X, y, y_label
+        elif i == iterations[index] - 1:
             X = np.stack(batch_list)
-            y = np.ones(shape=(len(batch_list), 1), dtype=np.int32)
-            y = class_index * y
+            y = np.zeros(shape=(len(batch_list), total), dtype=np.float32)
+            y[:, class_index] = 1
+            y_label = np.ones(shape=(len(batch_list)), dtype=np.int32)
+            y_label = y_label * class_index
             batch_list.clear()
-            yield X, y
+            yield X, y, y_label
         else:
             continue
-
-
-for i in range(4):
-    iterations.append(get_iteration(i))
-    print(iterations[i])
 
 pos_train_queue = tf.train.string_input_producer(data_scope["pos_train"])
 neg_train_queue = tf.train.string_input_producer(data_scope["neg_train"])
@@ -117,15 +118,36 @@ for i in range(len(queue_keys)):
     reader, key, value, img = get_list(data_scope[queue_keys[i]])
     sequence.append([reader, key, value, img])
 
-X = tf.placeholder(dtype=tf.float32, shape=(batch, height, width, 1))
-y = tf.placeholder(dtype=tf.int32, shape=(batch, 1))
+epsilon = tf.constant(0.1)
+classes = 2
 
-inception_v3_logit = InceptionV3(X, 2)
+X = tf.placeholder(dtype=tf.float32, shape=(batch, height, width, 1))
+Y = tf.placeholder(dtype=tf.float32, shape=(batch, classes))
+y_label = tf.placeholder(dtype=tf.int32, shape=(batch))
+
+I = InceptionV3(X, 2)
+inception_v3_logit = I.get_logit()
+
+save_interval = 10
+
+with tf.name_scope("accuracy"):
+    prob = tf.contrib.layers.softmax(inception_v3_logit)
+    correct = tf.nn.in_top_k(inception_v3_logit, y_label, 1)
+    accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
 
 with tf.name_scope("loss"):
-    
+    q = (1 - epsilon) * Y + (epsilon / classes)
+    l_prob = tf.log(prob)
+    div = -tf.multiply(l_prob, q)
+    sum = tf.reduce_sum(div, 1)
+    loss = tf.reduce_mean(sum, 0)
 
-init = tf.global_variables_initializer()
+    optimizer = tf.train.AdamOptimizer()
+    training_op = optimizer.minimize(loss)
+
+with tf.name_scope("init_and_save"):
+    init = tf.global_variables_initializer()
+    saver = tf.train.Saver()
 
 with tf.Session() as sess:
 
@@ -134,9 +156,36 @@ with tf.Session() as sess:
     # Start populating the filename queue.
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(coord=coord)
+    count = 0
     # Training sequence
-    for batch_X, batch_y in get_batch(sequence[0][3]):
-
+    for batch_X, batch_y, batch_label in get_batch(sequence[0][3], 0, 1, classes):
+        sess.run(training_op, feed_dict={X: batch_X, Y: batch_y, y_label: batch_label})
+        acc_train = accuracy.eval(feed_dict={X: batch_X, Y: batch_y, y_label: batch_label})
+        print("Batch : " + str(count) + ", Accuracy : " + str(acc_train))
+        count = count + 1
+        if count % save_interval == 0:
+            save_path = saver.save(sess, "./save/my_mnist_model")
+    count = 0
+    # Training sequence
+    for batch_X, batch_y in get_batch(sequence[1][3], 1, 0, classes):
+        sess.run(training_op, feed_dict={X: batch_X, Y: batch_y, y_label: batch_label})
+        acc_train = accuracy.eval(feed_dict={X: batch_X, Y: batch_y, y_label: batch_label})
+        print("Batch : " + str(count) + ", Accuracy : " + str(acc_train))
+        count = count + 1
+        if count % save_interval == 0:
+            save_path = saver.save(sess, "./save/my_mnist_model")
+    count = 0
+    # Test sequence
+    for batch_X, batch_y in get_batch(sequence[2][3], 2, 1, classes):
+        acc_train = accuracy.eval(feed_dict={X: batch_X, Y: batch_y, y_label: batch_label})
+        print("Batch : " + str(count) + ", Accuracy : " + str(acc_train))
+        count = count + 1
+    count = 0
+    # Test sequence
+    for batch_X, batch_y in get_batch(sequence[3][3], 3, 0, classes):
+        acc_train = accuracy.eval(feed_dict={X: batch_X, Y: batch_y, y_label: batch_label})
+        print("Batch : " + str(count) + ", Accuracy : " + str(acc_train))
+        count = count + 1
 
     coord.request_stop()
     coord.join(threads)
